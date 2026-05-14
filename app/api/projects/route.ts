@@ -5,7 +5,6 @@ import { getUserFromRequest } from '@/lib/auth';
 
 export async function GET() {
   try {
-    // Ambil 20 project terbaru dari Sorted Set (score = timestamp terbalik atau ZREVRANGE)
     const projectIds = await redis.zrevrange('wecollab:active_projects', 0, 19);
 
     if (projectIds.length === 0) {
@@ -16,16 +15,23 @@ export async function GET() {
     for (const id of projectIds) {
       const info = await redis.hgetall(`project:${id}:info`);
       if (info && info.id) {
-        // Ambil skills needed
-        const skillsNeeded = await redis.smembers(`project:${id}:skills_needed`);
+        const [skillsNeeded, memberCount, ownerProfile] = await Promise.all([
+          redis.smembers(`project:${id}:skills_needed`),
+          redis.scard(`project:${id}:members`),
+          redis.hgetall(`user:${info.owner_id}:profile`),
+        ]);
+
         projects.push({
           id: info.id,
           judul: info.judul,
           deskripsi: info.deskripsi,
           kategori: info.kategori,
+          status: info.status || 'open',
           owner_id: info.owner_id,
+          owner_nama: ownerProfile?.nama || 'Unknown',
           created_at: info.created_at,
           skills_needed: skillsNeeded,
+          member_count: memberCount,
         });
       }
     }
@@ -47,23 +53,26 @@ export async function POST(req: NextRequest) {
     const { judul, deskripsi, kategori, skills_needed } = await req.json();
 
     if (!judul || !deskripsi || !kategori) {
-      return NextResponse.json({ error: 'Judul, deskripsi, dan kategori wajib diisi' }, { status: 400 });
+      return NextResponse.json(
+        { error: 'Judul, deskripsi, dan kategori wajib diisi' },
+        { status: 400 }
+      );
     }
 
     const projectId = uuidv4();
     const timestamp = Date.now();
 
-    // 1. Simpan info project
+    // Simpan info project termasuk field status
     await redis.hset(`project:${projectId}:info`, {
       id: projectId,
       judul,
       deskripsi,
       kategori,
+      status: 'open',
       owner_id: userId,
       created_at: timestamp.toString(),
     });
 
-    // 2. Simpan skills yang dibutuhkan
     const skillList: string[] = Array.isArray(skills_needed) ? skills_needed : [];
     for (const skill of skillList) {
       const normalizedSkill = skill.toLowerCase().trim();
@@ -72,18 +81,12 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // 3. Tambahkan ke Sorted Set global active projects
     await redis.zadd('wecollab:active_projects', timestamp, projectId);
-
-    // 4. Owner otomatis jadi member
     await redis.sadd(`project:${projectId}:members`, userId);
     await redis.sadd(`user:${userId}:projects`, projectId);
 
     return NextResponse.json(
-      {
-        message: 'Project berhasil dibuat',
-        project_id: projectId,
-      },
+      { message: 'Project berhasil dibuat', project_id: projectId },
       { status: 201 }
     );
   } catch (error) {

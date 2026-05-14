@@ -133,11 +133,7 @@ export default function UserCard({ user, matchedSkills = [] }: UserCardProps) {
       {user.skills.length > 0 && (
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
           {user.skills.slice(0, 5).map((skill) => (
-            <SkillBadge
-              key={skill}
-              skill={skill}
-              size="sm"
-            />
+            <SkillBadge key={skill} skill={skill} size="sm" />
           ))}
           {user.skills.length > 5 && (
             <span style={{ fontSize: '11px', color: 'var(--text-muted)', display: 'flex', alignItems: 'center' }}>
@@ -163,8 +159,8 @@ export default function UserCard({ user, matchedSkills = [] }: UserCardProps) {
         </div>
       )}
 
-      {/* Action */}
-      <Link href={`/`} style={{ textDecoration: 'none' }}>
+      {/* Action — link menuju profil user yang benar */}
+      <Link href={`/profile/${user.id}`} style={{ textDecoration: 'none' }}>
         <button
           style={{
             width: '100%',

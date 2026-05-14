@@ -3,32 +3,88 @@ import redis from '@/lib/redis';
 import { getUserFromRequest } from '@/lib/auth';
 
 export async function GET(
-  req: NextRequest,
-  { params }: { params: { id: string } }
+  _req: NextRequest,
+  context: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { id } = await params;
+    const { id } = await context.params;
+
+    if (!id) {
+      return NextResponse.json({ error: 'ID tidak valid' }, { status: 400 });
+    }
 
     const info = await redis.hgetall(`project:${id}:info`);
-    if (!info || !info.id) {
+    if (!info || Object.keys(info).length === 0 || !info.id) {
       return NextResponse.json({ error: 'Project tidak ditemukan' }, { status: 404 });
     }
 
-    const members = await redis.smembers(`project:${id}:members`);
-    const skillsNeeded = await redis.smembers(`project:${id}:skills_needed`);
+    // Ambil data pendukung — masing-masing aman dari error
+    let memberIds: string[] = [];
+    let skillsNeeded: string[] = [];
+    let ownerProfile: Record<string, string> | null = null;
 
-    // (Opsional) Ambil detail owner
-    const owner = await redis.hgetall(`user:${info.owner_id}:profile`);
+    try {
+      memberIds = await redis.smembers(`project:${id}:members`);
+    } catch (_) { memberIds = []; }
+
+    try {
+      skillsNeeded = await redis.smembers(`project:${id}:skills_needed`);
+    } catch (_) { skillsNeeded = []; }
+
+    if (info.owner_id) {
+      try {
+        ownerProfile = await redis.hgetall(`user:${info.owner_id}:profile`);
+      } catch (_) { ownerProfile = null; }
+    }
+
+    // Expand setiap member ID ke profil — skip yang gagal
+    const members: Array<{
+      id: string;
+      nama: string;
+      jurusan: string;
+      avatar: string;
+      skills: string[];
+    }> = [];
+
+    for (const memberId of memberIds) {
+      try {
+        const profile = await redis.hgetall(`user:${memberId}:profile`);
+        if (profile && profile.id) {
+          members.push({
+            id: profile.id,
+            nama: profile.nama ?? '',
+            jurusan: profile.jurusan ?? '',
+            avatar: profile.avatar ?? '',
+            skills: profile.skills ? profile.skills.split(',').filter(Boolean) : [],
+          });
+        }
+      } catch (_) {
+        // skip member yang error, jangan crash seluruh endpoint
+      }
+    }
+
+    const ownerNama =
+      ownerProfile && ownerProfile.nama ? ownerProfile.nama : 'Unknown';
+    const owner =
+      ownerProfile && ownerProfile.id
+        ? { id: ownerProfile.id, nama: ownerProfile.nama ?? '', avatar: ownerProfile.avatar ?? '' }
+        : { id: info.owner_id ?? '', nama: 'Unknown' };
 
     return NextResponse.json({
-      id: info.id,
-      judul: info.judul,
-      deskripsi: info.deskripsi,
-      kategori: info.kategori,
-      created_at: info.created_at,
-      owner: owner && owner.id ? { id: owner.id, nama: owner.nama, avatar: owner.avatar } : { id: info.owner_id },
-      members,
-      skills_needed: skillsNeeded,
+      project: {
+        id: info.id,
+        judul: info.judul ?? '',
+        deskripsi: info.deskripsi ?? '',
+        kategori: info.kategori ?? '',
+        status: info.status ?? 'open',
+        created_at: info.created_at ?? '',
+        owner_id: info.owner_id ?? '',
+        owner_nama: ownerNama,
+        owner,
+        members,
+        member_count: members.length,
+        skills_needed: skillsNeeded,
+      },
     });
   } catch (error) {
     console.error('[Get Project Detail Error]', error);
@@ -38,7 +94,7 @@ export async function GET(
 
 export async function DELETE(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  context: { params: Promise<{ id: string }> }
 ) {
   try {
     const userId = await getUserFromRequest(req);
@@ -46,7 +102,7 @@ export async function DELETE(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const { id: projectId } = await params;
+    const { id: projectId } = await context.params;
 
     const info = await redis.hgetall(`project:${projectId}:info`);
     if (!info || !info.id) {
@@ -57,18 +113,16 @@ export async function DELETE(
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
-    // 1. Hapus info
-    await redis.del(`project:${projectId}:info`);
-    // 2. Hapus members
     const members = await redis.smembers(`project:${projectId}:members`);
-    await redis.del(`project:${projectId}:members`);
+    await Promise.all([
+      redis.del(`project:${projectId}:info`),
+      redis.del(`project:${projectId}:members`),
+      redis.del(`project:${projectId}:skills_needed`),
+      redis.zrem('wecollab:active_projects', projectId),
+    ]);
     for (const memberId of members) {
       await redis.srem(`user:${memberId}:projects`, projectId);
     }
-    // 3. Hapus skills needed
-    await redis.del(`project:${projectId}:skills_needed`);
-    // 4. Hapus dari active projects
-    await redis.zrem('wecollab:active_projects', projectId);
 
     return NextResponse.json({ message: 'Project berhasil dihapus' });
   } catch (error) {

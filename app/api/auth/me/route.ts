@@ -14,17 +14,19 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: 'User tidak ditemukan' }, { status: 404 });
     }
 
-    const userProjects = await redis.smembers(`user:${userId}:projects`);
+    const projectIds = await redis.smembers(`user:${userId}:projects`);
 
     return NextResponse.json({
-      id: profile.id,
-      nama: profile.nama,
-      email: profile.email,
-      jurusan: profile.jurusan,
-      bio: profile.bio,
-      skills: profile.skills ? profile.skills.split(',').filter(Boolean) : [],
-      avatar: profile.avatar,
-      projects: userProjects,
+      user: {
+        id: profile.id,
+        nama: profile.nama,
+        email: profile.email,
+        jurusan: profile.jurusan,
+        bio: profile.bio,
+        skills: profile.skills ? profile.skills.split(',').filter(Boolean) : [],
+        avatar: profile.avatar,
+        projectIds,
+      },
     });
   } catch (error) {
     console.error('[Get Me Error]', error);
@@ -50,32 +52,40 @@ export async function PUT(req: NextRequest) {
       ? skills.map((s: string) => s.toLowerCase().trim())
       : [];
 
-    // Update profil di Hash
-    await redis.hset(`user:${userId}:profile`, {
+    const updatedProfile = {
       ...existingProfile,
       nama: nama || existingProfile.nama,
       jurusan: jurusan || existingProfile.jurusan,
       bio: bio ?? existingProfile.bio,
       skills: skillList.join(','),
-    });
+    };
+
+    await redis.hset(`user:${userId}:profile`, updatedProfile);
 
     // Update index skills
-    // 1. Hapus user dari semua skill lama (opsional, jika kita track, tapi untuk simpelnya kita update di sini)
-    // Sebaiknya, kita ambil skill lama, hitung selisih, tapi untuk kemudahan kita asumsikan skill lama ada di existingProfile.skills
-    const oldSkills = existingProfile.skills ? existingProfile.skills.split(',') : [];
+    const oldSkills = existingProfile.skills
+      ? existingProfile.skills.split(',').filter(Boolean)
+      : [];
     for (const old of oldSkills) {
       if (old && !skillList.includes(old)) {
         await redis.srem(`skill:${old}:users`, userId);
       }
     }
-    // 2. Tambah ke skill baru
     for (const skill of skillList) {
       if (skill) {
         await redis.sadd(`skill:${skill}:users`, userId);
       }
     }
 
-    return NextResponse.json({ message: 'Profil berhasil diperbarui' });
+    return NextResponse.json({
+      message: 'Profil berhasil diperbarui',
+      user: {
+        nama: updatedProfile.nama,
+        jurusan: updatedProfile.jurusan,
+        bio: updatedProfile.bio,
+        skills: skillList,
+      },
+    });
   } catch (error) {
     console.error('[Update Me Error]', error);
     return NextResponse.json({ error: 'Terjadi kesalahan server' }, { status: 500 });

@@ -1,30 +1,34 @@
 import { NextRequest, NextResponse } from 'next/server';
 import redis from '@/lib/redis';
+import { getUserFromRequest } from '@/lib/auth';
 
 export async function POST(req: NextRequest) {
   try {
+    const currentUserId = await getUserFromRequest(req);
+
     const { skills } = await req.json();
 
     if (!skills || !Array.isArray(skills) || skills.length === 0) {
       return NextResponse.json({ error: 'Array skills wajib diberikan' }, { status: 400 });
     }
 
-    // Normalisasi array skills dan petakan ke nama keys Redis
-    const skillKeys = skills.map((s: string) => `skill:${s.toLowerCase().trim()}:users`);
+    const normalizedSkills = skills.map((s: string) => s.toLowerCase().trim());
+    const skillKeys = normalizedSkills.map((s: string) => `skill:${s}:users`);
 
-    // SINTER untuk mendapatkan user_id yang memiliki SEMUA skill yang diminta
     const matchedUserIds = await redis.sinter(...skillKeys);
 
     if (matchedUserIds.length === 0) {
-      return NextResponse.json({ matches: [] });
+      return NextResponse.json({ candidates: [], searched_skills: normalizedSkills });
     }
 
-    // Ambil detail profile tiap user yang match
-    const matches = [];
+    const candidates = [];
     for (const userId of matchedUserIds) {
+      // Saring user saat ini dari hasil
+      if (currentUserId && userId === currentUserId) continue;
+
       const profile = await redis.hgetall(`user:${userId}:profile`);
       if (profile && profile.id) {
-        matches.push({
+        candidates.push({
           id: profile.id,
           nama: profile.nama,
           email: profile.email,
@@ -36,7 +40,7 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    return NextResponse.json({ matches });
+    return NextResponse.json({ candidates, searched_skills: normalizedSkills });
   } catch (error) {
     console.error('[Match Error]', error);
     return NextResponse.json({ error: 'Terjadi kesalahan server' }, { status: 500 });
