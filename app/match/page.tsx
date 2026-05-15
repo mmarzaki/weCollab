@@ -1,6 +1,7 @@
 'use client';
 
-import { useState } from 'react';
+import { Suspense, useState, useEffect } from 'react';
+import { useSearchParams } from 'next/navigation';
 import Navbar from '../components/Navbar';
 import UserCard from '../components/UserCard';
 import SkillPicker from '../components/SkillPicker';
@@ -9,20 +10,32 @@ import { Toast, useToast, LoadingSpinner } from '../components/Toast';
 interface Candidate {
   id: string;
   nama: string;
+  email: string;
   jurusan: string;
+  rumpun: string;
   bio: string;
   skills: string[];
   avatar: string;
-  project_count: number;
+  same_rumpun: boolean;
 }
 
-export default function MatchPage() {
+function MatchContent() {
+  const searchParams = useSearchParams();
   const { toast, showToast, hideToast } = useToast();
   const [selectedSkills, setSelectedSkills] = useState<string[]>([]);
+  const [selectedRumpun, setSelectedRumpun] = useState('');
+  const [selectedCandidate, setSelectedCandidate] = useState<Candidate | null>(null);
   const [candidates, setCandidates] = useState<Candidate[]>([]);
   const [searchedSkills, setSearchedSkills] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
   const [hasSearched, setHasSearched] = useState(false);
+
+  useEffect(() => {
+    const skillsParam = searchParams.get('skills');
+    const rumpunParam = searchParams.get('rumpun');
+    if (skillsParam) setSelectedSkills(skillsParam.split(',').filter(Boolean));
+    if (rumpunParam) setSelectedRumpun(rumpunParam);
+  }, [searchParams]);
 
   const handleSearch = async () => {
     if (selectedSkills.length === 0) {
@@ -31,11 +44,12 @@ export default function MatchPage() {
     }
     setLoading(true);
     setHasSearched(true);
+    setSelectedCandidate(null);
     try {
       const res = await fetch('/api/match', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ skills: selectedSkills }),
+        body: JSON.stringify({ skills: selectedSkills, rumpun: selectedRumpun || undefined }),
       });
       const data = await res.json();
       if (!res.ok) {
@@ -155,6 +169,21 @@ export default function MatchPage() {
               </div>
             )}
 
+            {/* Rumpun filter */}
+            <div style={{ marginBottom: '16px' }}>
+              <p style={{ fontSize: '12px', fontWeight: '600', color: 'var(--text-secondary)', marginBottom: '8px' }}>
+                Filter Rumpun <span style={{ fontWeight: '400', color: 'var(--text-muted)' }}>(opsional — rumpun sama tampil lebih atas)</span>
+              </p>
+              <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                {['Semua', 'Saintek', 'Soshum', 'Bahasa'].map((r) => (
+                  <button key={r} onClick={() => setSelectedRumpun(r === 'Semua' ? '' : r)}
+                    style={{ padding: '6px 14px', borderRadius: '999px', fontSize: '12px', fontWeight: '600', cursor: 'pointer', transition: 'all 0.2s', background: (r === 'Semua' ? !selectedRumpun : selectedRumpun === r) ? 'rgba(0,212,255,0.15)' : 'rgba(255,255,255,0.05)', border: (r === 'Semua' ? !selectedRumpun : selectedRumpun === r) ? '1px solid rgba(0,212,255,0.4)' : '1px solid rgba(255,255,255,0.08)', color: (r === 'Semua' ? !selectedRumpun : selectedRumpun === r) ? '#00d4ff' : 'var(--text-secondary)' }}>
+                    {r}
+                  </button>
+                ))}
+              </div>
+            </div>
+
             <SkillPicker
               selectedSkills={selectedSkills}
               onChange={setSelectedSkills}
@@ -192,6 +221,26 @@ export default function MatchPage() {
               {loading ? 'Menjalankan SINTER...' : 'Cari Kandidat'}
             </button>
           </div>
+
+          {/* Panel kontak kandidat yang dipilih */}
+          {selectedCandidate && (
+            <div className="glass" style={{ padding: '20px', marginBottom: '28px', background: 'rgba(0,229,160,0.06)', border: '1px solid rgba(0,229,160,0.25)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px' }}>
+                <h3 style={{ fontSize: '15px', fontWeight: '700', color: '#00e5a0' }}>📬 Kontak Kandidat Terpilih</h3>
+                <button onClick={() => setSelectedCandidate(null)} style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontSize: '20px', lineHeight: 1 }}>×</button>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '14px', flexWrap: 'wrap' }}>
+                <img src={selectedCandidate.avatar} alt={selectedCandidate.nama} style={{ width: '50px', height: '50px', borderRadius: '14px', objectFit: 'cover', border: '2px solid rgba(0,229,160,0.3)' }} />
+                <div style={{ flex: 1 }}>
+                  <p style={{ fontWeight: '700', fontSize: '16px', marginBottom: '3px' }}>{selectedCandidate.nama}</p>
+                  <p style={{ color: 'var(--text-secondary)', fontSize: '13px', marginBottom: '6px' }}>{selectedCandidate.jurusan}{selectedCandidate.rumpun ? ` · ${selectedCandidate.rumpun}` : ''}</p>
+                  <a href={`mailto:${selectedCandidate.email}`} style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', color: '#00d4ff', fontWeight: '600', fontSize: '14px', textDecoration: 'none', background: 'rgba(0,212,255,0.1)', padding: '6px 14px', borderRadius: '8px', border: '1px solid rgba(0,212,255,0.2)' }}>
+                    📧 {selectedCandidate.email}
+                  </a>
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Results */}
           {hasSearched && (
@@ -265,11 +314,9 @@ export default function MatchPage() {
                   }}
                 >
                   {candidates.map((candidate) => (
-                    <UserCard
-                      key={candidate.id}
-                      user={candidate}
-                      matchedSkills={searchedSkills}
-                    />
+                    <div key={candidate.id} onClick={() => setSelectedCandidate(candidate as Candidate)} style={{ cursor: 'pointer' }}>
+                      <UserCard user={candidate} matchedSkills={searchedSkills} />
+                    </div>
                   ))}
                 </div>
               )}
@@ -288,5 +335,13 @@ export default function MatchPage() {
         </div>
       </main>
     </>
+  );
+}
+
+export default function MatchPage() {
+  return (
+    <Suspense fallback={<div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><LoadingSpinner size={36} /></div>}>
+      <MatchContent />
+    </Suspense>
   );
 }

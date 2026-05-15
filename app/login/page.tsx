@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { Suspense, useState, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { LoadingSpinner, Toast, useToast } from '../components/Toast';
 
@@ -9,7 +9,7 @@ const PRESET_SKILLS = [
   'Project Manager', 'Problem Solving', 'Language', 'Literature',
 ];
 
-export default function AuthPage() {
+function AuthContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { toast, showToast, hideToast } = useToast();
@@ -27,6 +27,8 @@ export default function AuthPage() {
   const [regEmail, setRegEmail] = useState('');
   const [regPassword, setRegPassword] = useState('');
   const [regConfirm, setRegConfirm] = useState('');
+  const [jurusan, setJurusan] = useState('');
+  const [rumpun, setRumpun] = useState('');
   const [skillInput, setSkillInput] = useState('');
   const [skills, setSkills] = useState<string[]>([]);
 
@@ -112,6 +114,8 @@ export default function AuthPage() {
           nama,
           email: regEmail,
           password: regPassword,
+          jurusan,
+          rumpun,
           skills,
         }),
       });
@@ -287,6 +291,35 @@ export default function AuthPage() {
                 {/* Step 2: Skills */}
                 {regStep === 2 && (
                   <>
+                    {/* Jurusan */}
+                    <input
+                      type="text"
+                      placeholder="Jurusan (contoh: Teknik Informatika)"
+                      value={jurusan}
+                      onChange={(e) => setJurusan(e.target.value)}
+                      className="auth-field-input"
+                    />
+
+                    {/* Rumpun */}
+                    <p className="auth-step-desc">Pilih rumpun ilmu</p>
+                    <div className="auth-skill-presets">
+                      {['Saintek', 'Soshum', 'Bahasa'].map((r) => (
+                        <button
+                          key={r}
+                          type="button"
+                          onClick={() => setRumpun(r)}
+                          className="auth-skill-preset-btn"
+                          style={{
+                            background: rumpun === r ? '#1a1a1a' : undefined,
+                            color: rumpun === r ? '#f5f0ea' : undefined,
+                            border: rumpun === r ? '1px solid #1a1a1a' : undefined,
+                          }}
+                        >
+                          {rumpun === r ? '✓ ' : ''}{r}
+                        </button>
+                      ))}
+                    </div>
+
                     <p className="auth-step-desc">
                       Pilih atau ketik skill ({skills.length}/10)
                     </p>
@@ -820,5 +853,13 @@ export default function AuthPage() {
         }
       `}</style>
     </>
+  );
+}
+
+export default function AuthPage() {
+  return (
+    <Suspense fallback={null}>
+      <AuthContent />
+    </Suspense>
   );
 }

@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import Navbar from '../components/Navbar';
 import ProjectCard from '../components/ProjectCard';
 import SkillBadge from '../components/SkillBadge';
@@ -12,28 +13,19 @@ interface Project {
   deskripsi: string;
   owner_id: string;
   owner_nama: string;
+  bidang: string;
   kategori: string;
+  rumpun: string;
   status: string;
   skills_needed: string[];
   member_count: number;
+  applicant_count: number;
   created_at: string;
 }
 
-const KATEGORI_LIST = [
-  'Semua',
-  'Web Development',
-  'Mobile App',
-  'Machine Learning',
-  'Data Science',
-  'UI/UX Design',
-  'Cybersecurity',
-  'IoT',
-  'Game Development',
-  'Riset',
-  'Bisnis',
-  'Lomba',
-  'Other',
-];
+const BIDANG_LIST = ['Lomba', 'Research', 'Proyek', 'Lainnya'];
+const RUMPUN_LIST = ['Saintek', 'Soshum', 'Bahasa'];
+const FILTER_LIST = ['Semua', ...BIDANG_LIST];
 
 const SKILLS_NEEDED_PRESETS = [
   'React', 'Next.js', 'Python', 'Figma', 'Machine Learning',
@@ -41,6 +33,7 @@ const SKILLS_NEEDED_PRESETS = [
 ];
 
 export default function ProjectsPage() {
+  const router = useRouter();
   const { toast, showToast, hideToast } = useToast();
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
@@ -50,8 +43,10 @@ export default function ProjectsPage() {
   const [newProject, setNewProject] = useState({
     judul: '',
     deskripsi: '',
-    kategori: '',
+    bidang: '',
+    rumpun: '',
     skills_needed: [] as string[],
+    cari_langsung: false,
   });
 
   useEffect(() => {
@@ -61,7 +56,7 @@ export default function ProjectsPage() {
   const fetchProjects = async () => {
     setLoading(true);
     try {
-      const res = await fetch('/api/projects?page=0');
+      const res = await fetch('/api/projects');
       const data = await res.json();
       if (data.projects) setProjects(data.projects);
     } finally {
@@ -71,8 +66,8 @@ export default function ProjectsPage() {
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newProject.judul || !newProject.kategori) {
-      showToast('Judul dan kategori wajib diisi', 'error');
+    if (!newProject.judul || !newProject.bidang) {
+      showToast('Judul dan bidang wajib diisi', 'error');
       return;
     }
     setCreating(true);
@@ -80,7 +75,7 @@ export default function ProjectsPage() {
       const res = await fetch('/api/projects', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(newProject),
+        body: JSON.stringify({ ...newProject, kategori: newProject.bidang }),
       });
       const data = await res.json();
       if (!res.ok) {
@@ -88,7 +83,11 @@ export default function ProjectsPage() {
       } else {
         showToast('Project berhasil dibuat! 🚀', 'success');
         setShowCreate(false);
-        setNewProject({ judul: '', deskripsi: '', kategori: '', skills_needed: [] });
+        setNewProject({ judul: '', deskripsi: '', bidang: '', rumpun: '', skills_needed: [], cari_langsung: false });
+        // Jika cari langsung, redirect ke match
+        if (newProject.cari_langsung && data.project_id) {
+          router.push(`/match?skills=${newProject.skills_needed.join(',')}&rumpun=${newProject.rumpun}`);
+        }
         await fetchProjects();
       }
     } catch {
@@ -108,9 +107,7 @@ export default function ProjectsPage() {
     }));
   };
 
-  const filtered = filter === 'Semua'
-    ? projects
-    : projects.filter((p) => p.kategori === filter);
+  const filtered = filter === 'Semua' ? projects : projects.filter((p) => p.bidang === filter || p.kategori === filter);
 
   return (
     <>
@@ -152,20 +149,26 @@ export default function ProjectsPage() {
                 />
               </div>
               <div>
-                <label style={{ display: 'block', fontSize: '13px', fontWeight: '600', color: 'var(--text-secondary)', marginBottom: '8px' }}>Kategori</label>
-                <select
-                  id="new-project-kategori"
-                  className="input-field"
-                  value={newProject.kategori}
-                  onChange={(e) => setNewProject((p) => ({ ...p, kategori: e.target.value }))}
-                  style={{ appearance: 'none', cursor: 'pointer' }}
-                  required
-                >
-                  <option value="">Pilih kategori...</option>
-                  {KATEGORI_LIST.filter((k) => k !== 'Semua').map((k) => (
-                    <option key={k} value={k} style={{ background: '#0d0d1a' }}>{k}</option>
+                <label style={{ display: 'block', fontSize: '13px', fontWeight: '600', color: 'var(--text-secondary)', marginBottom: '10px' }}>Bidang</label>
+                <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                  {BIDANG_LIST.map((b) => (
+                    <button key={b} type="button" onClick={() => setNewProject((p) => ({ ...p, bidang: b }))}
+                      style={{ padding: '7px 16px', borderRadius: '999px', fontSize: '13px', fontWeight: '600', cursor: 'pointer', transition: 'all 0.2s', background: newProject.bidang === b ? 'rgba(108,99,255,0.25)' : 'rgba(255,255,255,0.05)', border: newProject.bidang === b ? '1px solid rgba(108,99,255,0.5)' : '1px solid rgba(255,255,255,0.08)', color: newProject.bidang === b ? '#8b85ff' : 'var(--text-secondary)' }}>
+                      {newProject.bidang === b ? '✓ ' : ''}{b}
+                    </button>
                   ))}
-                </select>
+                </div>
+              </div>
+              <div>
+                <label style={{ display: 'block', fontSize: '13px', fontWeight: '600', color: 'var(--text-secondary)', marginBottom: '10px' }}>Rumpun yang Dibutuhkan</label>
+                <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                  {[...RUMPUN_LIST, 'Semua'].map((r) => (
+                    <button key={r} type="button" onClick={() => setNewProject((p) => ({ ...p, rumpun: r === 'Semua' ? '' : r }))}
+                      style={{ padding: '7px 16px', borderRadius: '999px', fontSize: '13px', fontWeight: '600', cursor: 'pointer', transition: 'all 0.2s', background: (r === 'Semua' ? !newProject.rumpun : newProject.rumpun === r) ? 'rgba(0,212,255,0.15)' : 'rgba(255,255,255,0.05)', border: (r === 'Semua' ? !newProject.rumpun : newProject.rumpun === r) ? '1px solid rgba(0,212,255,0.4)' : '1px solid rgba(255,255,255,0.08)', color: (r === 'Semua' ? !newProject.rumpun : newProject.rumpun === r) ? '#00d4ff' : 'var(--text-secondary)' }}>
+                      {r}
+                    </button>
+                  ))}
+                </div>
               </div>
               <div>
                 <label style={{ display: 'block', fontSize: '13px', fontWeight: '600', color: 'var(--text-secondary)', marginBottom: '8px' }}>Deskripsi</label>
@@ -181,7 +184,7 @@ export default function ProjectsPage() {
               </div>
               <div>
                 <label style={{ display: 'block', fontSize: '13px', fontWeight: '600', color: 'var(--text-secondary)', marginBottom: '10px' }}>
-                  Skills Dibutuhkan
+                  Skills Dibutuhkan <span style={{ fontWeight: '400', color: 'var(--text-muted)' }}>(opsional)</span>
                 </label>
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
                   {SKILLS_NEEDED_PRESETS.map((skill) => {
@@ -217,6 +220,22 @@ export default function ProjectsPage() {
                   </div>
                 )}
               </div>
+              {/* Cari Langsung Toggle */}
+              <div style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '12px', padding: '14px' }}>
+                <p style={{ fontSize: '13px', fontWeight: '600', color: 'var(--text-secondary)', marginBottom: '10px' }}>Setelah dibuat:</p>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                  {[
+                    { value: false, label: '💾 Simpan — biarkan orang melamar', desc: 'Project tampil di daftar, orang lain bisa apply' },
+                    { value: true, label: '🔍 Langsung cari anggota', desc: 'Redirect ke halaman pencarian sesuai skill & rumpun project' },
+                  ].map((opt) => (
+                    <button key={String(opt.value)} type="button" onClick={() => setNewProject((p) => ({ ...p, cari_langsung: opt.value }))}
+                      style={{ padding: '10px 14px', borderRadius: '10px', cursor: 'pointer', textAlign: 'left', transition: 'all 0.2s', background: newProject.cari_langsung === opt.value ? 'rgba(108,99,255,0.15)' : 'transparent', border: newProject.cari_langsung === opt.value ? '1px solid rgba(108,99,255,0.35)' : '1px solid transparent', color: 'var(--text-primary)' }}>
+                      <div style={{ fontWeight: '600', fontSize: '13px' }}>{opt.label}</div>
+                      <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px' }}>{opt.desc}</div>
+                    </button>
+                  ))}
+                </div>
+              </div>
               <div style={{ display: 'flex', gap: '12px', paddingTop: '8px' }}>
                 <button type="button" onClick={() => setShowCreate(false)} className="btn-secondary" style={{ flex: 1, padding: '13px' }}>
                   Batal
@@ -243,7 +262,7 @@ export default function ProjectsPage() {
                   }}
                 >
                   {creating ? <LoadingSpinner size={16} /> : null}
-                  {creating ? 'Membuat...' : '🚀 Buat Project'}
+                  {creating ? 'Membuat...' : (newProject.cari_langsung ? '🔍 Buat & Cari Anggota' : '🚀 Buat Project')}
                 </button>
               </div>
             </form>
@@ -261,10 +280,7 @@ export default function ProjectsPage() {
                 🚀 Browse Projects
               </h1>
               <p style={{ color: 'var(--text-secondary)', fontSize: '14px' }}>
-                {projects.length} project aktif · via{' '}
-                <code style={{ color: '#00d4ff', fontSize: '12px', background: 'rgba(0,212,255,0.1)', padding: '2px 6px', borderRadius: '4px' }}>
-                  ZREVRANGE
-                </code>
+                {projects.length} project aktif
               </p>
             </div>
             <button
@@ -278,7 +294,7 @@ export default function ProjectsPage() {
 
           {/* Filter by Kategori */}
           <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', paddingBottom: '8px', marginBottom: '28px' }}>
-            {KATEGORI_LIST.map((k) => (
+            {FILTER_LIST.map((k) => (
               <button
                 key={k}
                 onClick={() => setFilter(k)}
