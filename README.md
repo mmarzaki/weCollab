@@ -1,3 +1,13 @@
+## Update #2
+
+app/api/auth/me/route.ts: GET profil user + PUT update profil, lengkap dengan field rumpun.
+app/api/projects/route.ts: GET list project + POST buat project, dengan field bidang, rumpun, cari_langsung, dan applicant_count.
+app/api/match/route.ts: POST search dengan logika sorting rumpun (rumpun sama tampil lebih atas).
+app/api/projects/[id]/route.ts: GET detail project + DELETE hapus, dengan field is_owner, is_applicant, is_accepted, dan show_owner_contact.
+app/api/projects/[id]/apply/route.ts: POST (lamar) dan DELETE (batalkan lamaran), keduanya dengan context.params yang benar.
+app/api/projects/[id]/applications/route.ts: GET (lihat pelamar) dan POST (terima/tolak), menggantikan PUT yang salah sebelumnya.
+app/api/auth/register/route.ts: menyimpan dan mengindex rumpun user ke Redis.
+
 This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
 
 ## Getting Started
