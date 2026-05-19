@@ -43,24 +43,24 @@ export default function SkillBadge({ skill, size = 'md', removable = false, onRe
 
   const colorStyles = {
     cyan: {
-      background: 'rgba(0, 212, 255, 0.15)',
-      color: '#40e0ff',
-      border: '1px solid rgba(0, 212, 255, 0.25)',
+      background: '#ede8e1',
+      color: '#1a1a1a',
+      border: '1px solid #ccc8c0',
     },
     purple: {
-      background: 'rgba(108, 99, 255, 0.2)',
-      color: '#8b85ff',
-      border: '1px solid rgba(108, 99, 255, 0.3)',
+      background: '#e8e3dc',
+      color: '#1a1a1a',
+      border: '1px solid #bbb5ad',
     },
     green: {
-      background: 'rgba(0, 229, 160, 0.15)',
-      color: '#00e5a0',
-      border: '1px solid rgba(0, 229, 160, 0.25)',
+      background: '#ede8e1',
+      color: '#2d6a4f',
+      border: '1px solid #b8c9bc',
     },
     pink: {
-      background: 'rgba(255, 107, 157, 0.15)',
-      color: '#ff6b9d',
-      border: '1px solid rgba(255, 107, 157, 0.25)',
+      background: '#ede8e1',
+      color: '#7b3f5e',
+      border: '1px solid #c9b8be',
     },
   };
 

@@ -107,3 +107,48 @@ export async function DELETE(
     return NextResponse.json({ error: 'Terjadi kesalahan server' }, { status: 500 });
   }
 }
+
+export async function PUT(
+  req: NextRequest,
+  context: { params: Promise<{ id: string }> }
+) {
+  try {
+    const userId = await getUserFromRequest(req);
+    if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
+    const { id: projectId } = await context.params;
+    const info = await redis.hgetall(`project:${projectId}:info`);
+    if (!info || !info.id) return NextResponse.json({ error: 'Project tidak ditemukan' }, { status: 404 });
+    if (info.owner_id !== userId) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+
+    const { judul, deskripsi, bidang, kategori, rumpun, status, skills_needed } = await req.json();
+    const finalBidang = bidang || kategori || '';
+
+    const updateFields: Record<string, string> = {};
+    if (judul !== undefined) updateFields.judul = judul;
+    if (deskripsi !== undefined) updateFields.deskripsi = deskripsi;
+    if (finalBidang !== undefined) {
+      updateFields.bidang = finalBidang;
+      updateFields.kategori = finalBidang;
+    }
+    if (rumpun !== undefined) updateFields.rumpun = rumpun || '';
+    if (status !== undefined) updateFields.status = status || 'open';
+
+    if (Object.keys(updateFields).length > 0) {
+      await redis.hset(`project:${projectId}:info`, updateFields);
+    }
+
+    if (skills_needed !== undefined && Array.isArray(skills_needed)) {
+      await redis.del(`project:${projectId}:skills_needed`);
+      for (const skill of skills_needed) {
+        const ns = skill.trim();
+        if (ns) await redis.sadd(`project:${projectId}:skills_needed`, ns);
+      }
+    }
+
+    return NextResponse.json({ message: 'Project berhasil diperbarui' });
+  } catch (error) {
+    console.error('[Update Project Error]', error);
+    return NextResponse.json({ error: 'Terjadi kesalahan server' }, { status: 500 });
+  }
+}
