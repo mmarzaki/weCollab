@@ -619,7 +619,7 @@ export default function DashboardPage() {
       
       {/* ── Top Navigation ── */}
       <header style={{
-        background: "#1967d2",
+        background: "#1a1a1a",
         borderBottom: "none",
         height: 56,
         display: "flex",
@@ -668,7 +668,7 @@ export default function DashboardPage() {
                     borderRadius: 8,
                     background: isActive ? "#ffffff" : "transparent",
                     border: "none",
-                    color: isActive ? "#1967d2" : "rgba(255, 255, 255, 0.8)",
+                    color: isActive ? "#1a1a1a" : "rgba(255, 255, 255, 0.8)",
                     fontWeight: isActive ? 600 : 500,
                     fontSize: 13,
                     cursor: "pointer",

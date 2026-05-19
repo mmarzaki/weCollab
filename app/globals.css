@@ -54,34 +54,7 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
-/* ======================================================
-   Scrollbar Styling
-====================================================== */
-html::-webkit-scrollbar,
-body::-webkit-scrollbar,
-*::-webkit-scrollbar {
-  width: 12px !important;
-  height: 12px !important;
-}
-html::-webkit-scrollbar-track,
-body::-webkit-scrollbar-track,
-*::-webkit-scrollbar-track {
-  background: rgba(255, 247, 238, 0.4) !important;
-  backdrop-filter: blur(8px) !important;
-  -webkit-backdrop-filter: blur(8px) !important;
-}
-html::-webkit-scrollbar-thumb,
-body::-webkit-scrollbar-thumb,
-*::-webkit-scrollbar-thumb {
-  background: #1967d2 !important;
-  border: 3px solid rgba(255, 247, 238, 0.4) !important;
-  border-radius: 6px !important;
-}
-html::-webkit-scrollbar-thumb:hover,
-body::-webkit-scrollbar-thumb:hover,
-*::-webkit-scrollbar-thumb:hover {
-  background: #1150a8 !important;
-}
+
 
 /* ======================================================
    Glassmorphism Components
