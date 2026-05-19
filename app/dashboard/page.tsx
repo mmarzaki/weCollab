@@ -712,7 +712,7 @@ export default function DashboardPage() {
                 position: "absolute",
                 top: calcDropdownTop(),
                 right: 0,
-                background: "#FFF7EE",
+                background: "#ffffff",
                 border: "1px solid #e8eaed",
                 borderRadius: 8,
                 minWidth: 160,
